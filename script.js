@@ -1,35 +1,42 @@
-const gameCanvas = document.getElementById("game").getContext("2d");
-document.getElementById("game").width = window.innerWidth;
-document.getElementById("game").height = window.innerHeight;
-const width = document.getElementById("game").width;
-const height = document.getElementById("game").height;
+import Rules from './rules.js';
+
+const canvas = document.getElementById('canvas');
+const context = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
 const pixelSize = 5;
 const spawnProbability = 0;
 const targetFPS = 24;
 
-const draw = (x, y, c, s) => {
-    gameCanvas.fillStyle = c;
-    gameCanvas.fillRect(x, y, s, s);
-}
 
 let grid = [];
-let temporaryGrid = [];
+let bufferGrid = [];
 
-const cellValue = (x, y) => {
-    x = (x + width / pixelSize) % (width / pixelSize);
-    y = (y + height / pixelSize) % (height / pixelSize);
+let animationHandle;
+let currentRule;
+const ruleSelect = document.getElementById('ruleSetSelection');
+const pausePlayButton = document.getElementById('pause');
+let isPaused = false;
+
+function draw(x, y, color, size) {
+    context.fillStyle = color;
+    context.fillRect(x, y, size, size);
+}
+
+function cellValue(x, y) {
+    x = (x + canvas.width / pixelSize) % (canvas.width / pixelSize);
+    y = (y + canvas.height / pixelSize) % (canvas.height / pixelSize);
 
     return grid[x][y];
 }
 
-const countNeighbors = (x, y) => {
+function countNeighbors(x, y) {
     let count = 0;
 
     for (let dx = -1; dx <= 1; dx++) {
         for (let dy = -1; dy <= 1; dy++) {
-            if (dx === 0 && dy === 0) {
-                continue;
-            }
+            if (dx === 0 && dy === 0) continue;
             count += cellValue(x + dx, y + dy);
         }
     }
@@ -37,118 +44,121 @@ const countNeighbors = (x, y) => {
     return count;
 }
 
-
-//Conway ruleset
-const updateCell = (x, y) => {
-    neighbor = countNeighbors(x, y);
-    if (grid[x][y] == 1 && (neighbor == 2 || neighbor == 3)) {
-        return 1;
+function update(timestamp) {
+    if (!update.lastTimeStamp) {
+        update.lastTimeStamp = timestamp;
     }
-    if (grid[x][y] == 1 && (neighbor < 2 || neighbor > 3)) {
-        return 0;
-    }
-    if (grid[x][y] == 0 && neighbor == 3) {
-        return 1;
-    }
-
-    return 0;
-}
-
-
-
-
-const update = (timestamp) => {
-    if (!update.lastTimestamp) {
-        update.lastTimestamp = timestamp;
-    }
-    const deltaTime = timestamp - update.lastTimestamp;
+    let deltaTime = timestamp - update.lastTimeStamp;
 
     if (deltaTime >= 1000 / targetFPS) {
-        gameCanvas.clearRect(0, 0, width, height);
-        draw(0, 0, "black", width);
-        temporaryGrid = initializeArray(width / pixelSize, height / pixelSize);
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        draw(0, 0, 'black', canvas.width);
+        bufferGrid = Array.from({ length: canvas.width }, () => Array(canvas.height).fill(0));
 
-        for (let x = 0; x < width / pixelSize; x++) {
-            for (let y = 0; y < height / pixelSize; y++) {
-                temporaryGrid[x][y] = updateCell(x, y);
+        for (let x = 0; x < canvas.width / pixelSize; x++) {
+            for (let y = 0; y < canvas.height / pixelSize; y++) {
+                bufferGrid[x][y] = currentRule(x, y, countNeighbors, grid);
             }
         }
 
-        grid = temporaryGrid;
+        grid = bufferGrid;
 
-        for (let x = 0; x < width / pixelSize; x++) {
-            for (let y = 0; y < height / pixelSize; y++) {
+        for (let x = 0; x < canvas.width / pixelSize; x++) {
+            for (let y = 0; y < canvas.height / pixelSize; y++) {
                 if (grid[x][y]) {
-                    draw(x * pixelSize, y * pixelSize, `rgb(${x / 2}, ${y / 2}, 255)`, pixelSize)
+                    draw(x * pixelSize, y * pixelSize, `rgb(${x / 2}, ${y / 2}, 255)`, pixelSize);
                 }
             }
         }
-
-        update.lastTimestamp = timestamp;
+        update.lastTimeStamp = timestamp;
     }
-
     animationHandle = requestAnimationFrame(update);
 }
 
-const initializeArray = (w, h) => {
-    let arr = [];
-    for (let x = 0; x < w; x++) {
-        arr[x] = [];
-        for (let y = 0; y < h; y++) {
-            arr[x][y] = 0;
-        }
-    }
-    return arr;
-}
-
-const initialize = () => {
-    grid = initializeArray(width / pixelSize, height / pixelSize);
-
-    for (let x = 0; x < width / pixelSize; x++) {
-        for (let y = 0; y < height / pixelSize; y++) {
+function initialize() {
+    grid = Array.from({ length: canvas.width }, () => Array(canvas.height).fill(0));
+    currentRule = Rules[ruleSelect.value] || Rules.conway;
+    isPaused = false;
+    for (let x = 0; x < canvas.width / pixelSize; x++) {
+        for (let y = 0; y < canvas.height / pixelSize; y++) {
             if (Math.random() > spawnProbability) {
                 grid[x][y] = 1;
             }
         }
     }
-
     requestAnimationFrame(update);
 }
 
-document.getElementById("game").addEventListener("click", (e) => {
-    const mouseX = e.clientX - gameCanvas.canvas.offsetLeft;
-    const mouseY = e.clientY - gameCanvas.canvas.offsetTop;
-    const x = Math.floor(mouseX / pixelSize);
-    const y = Math.floor(mouseY / pixelSize);
-
-    // set a cluster of live cells
-    for (let i = -2; i <= 2; i++) {
-        for (let j = -2; j <= 2; j++) {
-            const newX = x + i;
-            const newY = y + j;
-
-
-            if (newX >= 0 && newX < grid.length && newY >= 0 && newY < grid[0].length) {
-                grid[newX][newY] = 1;
-                draw(newX * pixelSize, newY * pixelSize, `rgb(${x}, ${y}, 0)`, pixelSize);
-            }
-        }
-    }
-});
-
 initialize();
 
-let animationHandle;
-
-const cancelAnimation = () => {
+function cancelAnimation() {
     if (animationHandle) {
         cancelAnimationFrame(animationHandle);
         animationHandle = null;
     }
 }
 
-const resetButton = document.getElementById("reset");
-resetButton.addEventListener("click", () => {
+function toggleAnimation() {
+    if (isPaused) {
+        isPaused = false;
+        pausePlayButton.textContent = 'Pause';
+        requestAnimationFrame(update);
+    } else {
+        isPaused = true;
+        pausePlayButton.textContent = 'Play';
+        cancelAnimation();
+    }
+}
+
+const resetButton = document.getElementById('reset');
+resetButton.addEventListener('click', () => {
     cancelAnimation();
     initialize();
 });
+
+document.getElementById('canvas').addEventListener('click', (e) => {
+    const mouseX = e.clientX - context.canvas.offsetLeft;
+    const mouseY = e.clientY - context.canvas.offsetTop;
+    const x = Math.floor(mouseX / pixelSize);
+    const y = Math.floor(mouseY / pixelSize);
+
+    for (let i = -2; i <= 2; i++) {
+        for (let j = -2; j <= 2; j++) {
+            const newX = x + i;
+            const newY = y + j;
+
+            if (newX >= 0 && newX < grid.length && newY >= 0 && newY < grid[0].length) {
+                grid[newX][newY] = 1;
+                draw(newX * pixelSize, newY * pixelSize, 'red', pixelSize);
+            }
+        }
+    }
+});
+
+ruleSelect.addEventListener('change', function () {
+    cancelAnimation();
+
+    switch (ruleSelect.value) {
+        case 'conway':
+            currentRule = Rules.conway;
+            break;
+        case 'highlife':
+            currentRule = Rules.highlife;
+            break;
+        case 'briansBrain':
+            currentRule = Rules.briansBrain;
+            break;
+        case 'walledCity':
+            currentRule = Rules.walledCity;
+            break;
+        case 'dayAndNight':
+            currentRule = Rules.dayAndNight;
+            break;
+    }
+
+    if (!isPaused) {
+        requestAnimationFrame(update);
+    }
+});
+
+pausePlayButton.addEventListener('click', toggleAnimation);
