@@ -5,12 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Conway's Game of Life</title>
     <link rel="stylesheet" href="styles.css">
+    <script defer type="module" src="script.js"></script>
 </head>
 <body>
     <header>
+        <button id="pause">Pause</button>
         <button id="reset">Reset</button>
+        <label for="ruleSetSelection">select a rule set:</label>
+        <select id="ruleSetSelection">
+            <option value="conway">Conway's Game of Life</option>
+            <option value="highlife">Highlife</option>
+            <option value="briansBrain">Brian's Brain</option>
+            <option value="walledCity">Walled City</option>
+            <option value="dayAndNight">Day and Night</option>
+        </select>
     </header>
-    <canvas id="game" width="1280" height="720"></canvas>
-    <script src="script.js"></script>
+    <canvas id="canvas"></canvas>
+    
 </body>
 </html>
